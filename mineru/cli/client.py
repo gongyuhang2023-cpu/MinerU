@@ -58,7 +58,7 @@ from .common import do_parse, read_fn, pdf_suffixes, image_suffixes
     '-b',
     '--backend',
     'backend',
-    type=click.Choice(['pipeline', 'vlm-http-client', 'hybrid-http-client', 'vlm-auto-engine', 'hybrid-auto-engine',]),
+    type=click.Choice(['pipeline', 'vlm-http-client', 'hybrid-http-client', 'vlm-auto-engine', 'hybrid-auto-engine', 'deepseek-auto-engine']),
     help="""\b
     the backend for parsing pdf:
       pipeline: More general.
@@ -66,6 +66,7 @@ from .common import do_parse, read_fn, pdf_suffixes, image_suffixes
       vlm-http-client: High accuracy via remote computing power(client suitable for openai-compatible servers).
       hybrid-auto-engine: Next-generation high accuracy solution via local computing power.
       hybrid-http-client: High accuracy but requires a little local computing power(client suitable for openai-compatible servers).
+      deepseek-auto-engine: DeepSeek-OCR-2 (3B) for high accuracy PDF parsing.
     Without method specified, hybrid-auto-engine will be used by default.""",
     default='hybrid-auto-engine',
 )

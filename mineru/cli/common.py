@@ -17,6 +17,8 @@ from mineru.utils.pdf_image_tools import images_bytes_to_pdf_bytes
 from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
 from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
 from mineru.backend.vlm.vlm_analyze import aio_doc_analyze as aio_vlm_doc_analyze
+from mineru.backend.deepseek.deepseek_analyze import doc_analyze as deepseek_doc_analyze
+from mineru.backend.deepseek.deepseek_middle_json_mkcontent import union_make as deepseek_union_make
 from mineru.utils.pdf_page_id import get_end_page_id
 
 if os.getenv("MINERU_LMDEPLOY_DEVICE", "") == "maca":
@@ -481,6 +483,73 @@ def do_parse(
                 f_dump_model_output, f_dump_orig_pdf, f_dump_content_list, f_make_md_mode,
                 server_url, **kwargs,
             )
+        elif backend.startswith("deepseek-"):
+            # DeepSeek-OCR-2 backend
+            _process_deepseek(
+                output_dir, pdf_file_names, pdf_bytes_list,
+                f_draw_layout_bbox, f_draw_span_bbox, f_dump_md, f_dump_middle_json,
+                f_dump_model_output, f_dump_orig_pdf, f_dump_content_list, f_make_md_mode,
+                **kwargs,
+            )
+
+
+def _process_deepseek(
+        output_dir,
+        pdf_file_names,
+        pdf_bytes_list,
+        f_draw_layout_bbox,
+        f_draw_span_bbox,
+        f_dump_md,
+        f_dump_middle_json,
+        f_dump_model_output,
+        f_dump_orig_pdf,
+        f_dump_content_list,
+        f_make_md_mode,
+        **kwargs,
+):
+    """Process PDF using DeepSeek-OCR-2 backend."""
+    parse_method = "deepseek"
+    f_draw_span_bbox = False  # DeepSeek doesn't provide bbox info
+
+    for idx, pdf_bytes in enumerate(pdf_bytes_list):
+        pdf_file_name = pdf_file_names[idx]
+        local_image_dir, local_md_dir = prepare_env(output_dir, pdf_file_name, parse_method)
+        image_writer, md_writer = FileBasedDataWriter(local_image_dir), FileBasedDataWriter(local_md_dir)
+
+        # Run DeepSeek analysis
+        middle_json = deepseek_doc_analyze(
+            pdf_bytes, image_writer=image_writer, **kwargs,
+        )
+
+        pdf_info = middle_json.get("pdf_info", [])
+
+        # Generate markdown directly from DeepSeek output
+        markdown_content = deepseek_union_make(middle_json, f_make_md_mode)
+
+        # Save markdown
+        if f_dump_md:
+            md_writer.write(f"{pdf_file_name}.md", markdown_content.encode('utf-8'))
+            logger.info(f"local output dir is {local_md_dir}")
+
+        # Save middle_json
+        if f_dump_middle_json:
+            md_writer.write(
+                f"{pdf_file_name}_middle.json",
+                json.dumps(middle_json, ensure_ascii=False, indent=2).encode('utf-8')
+            )
+
+        # Save content list
+        if f_dump_content_list:
+            from mineru.backend.deepseek.deepseek_middle_json_mkcontent import make_content_list
+            content_list = make_content_list(middle_json)
+            md_writer.write(
+                f"{pdf_file_name}_content_list.json",
+                json.dumps(content_list, ensure_ascii=False, indent=2).encode('utf-8')
+            )
+
+        # Save original PDF
+        if f_dump_orig_pdf:
+            md_writer.write(f"{pdf_file_name}_origin.pdf", pdf_bytes)
 
 
 async def aio_do_parse(
